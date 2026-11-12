@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chamada remota</title>
+<style>
+:root{
+  --bg:#eef2f1;--panel:#ffffff;--ink:#14231f;--muted:#5b6b66;--line:#cdd8d4;
+  --accent:#0b7a62;--accent-ink:#ffffff;--bad:#b3261e;--stage:#0f1a17;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#0e1614;--panel:#16221f;--ink:#e6f0ec;--muted:#93a69f;--line:#294039;--accent:#3fd0a8;--accent-ink:#06211a;--bad:#ff8a80;--stage:#070d0b}
+}
+:root[data-theme="dark"]{--bg:#0e1614;--panel:#16221f;--ink:#e6f0ec;--muted:#93a69f;--line:#294039;--accent:#3fd0a8;--accent-ink:#06211a;--bad:#ff8a80;--stage:#070d0b}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.6rem;margin:0 0 4px}
+h2{font-size:1.05rem;margin:0 0 8px}
+p{margin:0 0 10px}
+.sub{color:var(--muted);max-width:68ch}
+.stage{position:relative;background:var(--stage);border-radius:14px;overflow:hidden;aspect-ratio:16/9;margin:18px 0 12px}
+.stage video{width:100%;height:100%;object-fit:cover;display:block;background:var(--stage)}
+#local{position:absolute;right:12px;bottom:12px;width:26%;min-width:110px;aspect-ratio:4/3;border-radius:10px;border:2px solid var(--panel);object-fit:cover;transform:scaleX(-1)}
+.ph{position:absolute;inset:0;display:grid;place-items:center;color:#9fb3ac;text-align:center;padding:16px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
+.status{margin-left:auto;font-size:.9rem;color:var(--muted)}
+.status b{color:var(--ink)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:720px){.cols{grid-template-columns:1fr}}
+textarea{width:100%;min-height:96px;resize:vertical;font:12px/1.4 ui-monospace,Consolas,monospace;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 14px;border-radius:8px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.msg{font-size:.9rem;color:var(--muted);min-height:1.4em}
+.msg.err{color:var(--bad)}
+ol.steps{margin:0;padding-left:20px;color:var(--muted);font-size:.92rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Chamada remota</h1>
+  <p class="sub">Liga dois dispositivos diretamente (WebRTC) para partilhar câmara e microfone. O vídeo e o áudio vão de um dispositivo para o outro, sem servidor pelo meio. Trocam apenas dois códigos de ligação.</p>
+
+  <div class="stage">
+    <video id="remote" autoplay playsinline></video>
+    <div class="ph" id="ph">À espera da ligação do outro dispositivo</div>
+    <video id="local" autoplay playsinline muted></video>
+  </div>
+
+  <div class="bar">
+    <button id="btn-cam" class="primary">Ligar câmara e microfone</button>
+    <button id="btn-mic" disabled>Silenciar microfone</button>
+    <button id="btn-vid" disabled>Desligar câmara</button>
+    <button id="btn-end" class="danger" disabled>Terminar chamada</button>
+    <span class="status">Estado: <b id="state">sem ligação</b></span>
+  </div>
+  <div class="msg" id="msg"></div>
+
+  <div class="cols">
+    <div class="panel">
+      <h2>Dispositivo A: iniciar chamada</h2>
+      <ol class="steps">
+        <li>Liga a câmara e prime “Criar código”.</li>
+        <li>Envia o código ao dispositivo B.</li>
+        <li>Cola aqui o código de resposta e prime “Ligar”.</li>
+      </ol>
+      <p></p>
+      <button id="a-create" class="primary" disabled>Criar código</button>
+      <textarea id="a-offer" readonly placeholder="O teu código aparece aqui"></textarea>
+      <div class="row"><button id="a-copy" disabled>Copiar código</button></div>
+      <p></p>
+      <textarea id="a-answer" placeholder="Cola aqui o código de resposta do dispositivo B"></textarea>
+      <button id="a-connect" disabled>Ligar</button>
+    </div>
+
+    <div class="panel">
+      <h2>Dispositivo B: entrar na chamada</h2>
+      <ol class="steps">
+        <li>Liga a câmara.</li>
+        <li>Cola o código recebido do dispositivo A e prime “Gerar resposta”.</li>
+        <li>Devolve o código de resposta ao dispositivo A.</li>
+      </ol>
+      <p></p>
+      <textarea id="b-offer" placeholder="Cola aqui o código do dispositivo A"></textarea>
+      <button id="b-create" class="primary" disabled>Gerar resposta</button>
+      <textarea id="b-answer" readonly placeholder="A tua resposta aparece aqui"></textarea>
+      <div class="row"><button id="b-copy" disabled>Copiar resposta</button></div>
+    </div>
+  </div>
+
+  <p class="sub">Requer Chrome, Edge, Safari ou Firefox atual. Se a página estiver a correr dentro de uma moldura e o browser recusar a câmara, abre-a num separador próprio. Em redes muito restritivas a ligação direta pode falhar.</p>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var stream=null, pc=null;
+  var CFG={iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}]};
+
+  function say(t,err){var m=$("msg");m.textContent=t||"";m.className="msg"+(err?" err":"")}
+  function setState(t){$("state").textContent=t}
+  function enc(d){return btoa(unescape(encodeURIComponent(JSON.stringify(d))))}
+  function dec(s){return JSON.parse(decodeURIComponent(escape(atob(s.replace(/\s+/g,"")))))}
+
+  function newPC(){
+    if(pc){try{pc.close()}catch(e){}}
+    pc=new RTCPeerConnection(CFG);
+    stream.getTracks().forEach(function(t){pc.addTrack(t,stream)});
+    pc.ontrack=function(e){
+      $("remote").srcObject=e.streams[0];
+      $("ph").style.display="none";
+    };
+    pc.onconnectionstatechange=function(){
+      var s=pc.connectionState;
+      var map={new:"a preparar",connecting:"a ligar",connected:"ligado",disconnected:"desligado",failed:"falhou",closed:"terminada"};
+      setState(map[s]||s);
+      if(s==="connected"){say("Ligação estabelecida.");$("btn-end").disabled=false}
+      if(s==="failed"){say("A ligação falhou. Verifica a rede e repete os passos com códigos novos.",true)}
+      if(s==="disconnected"||s==="failed"||s==="closed"){$("ph").style.display="grid"}
+    };
+    return pc;
+  }
+
+  function gathered(){
+    return new Promise(function(res){
+      if(pc.iceGatheringState==="complete")return res();
+      var t=setTimeout(res,4000);
+      pc.addEventListener("icegatheringstatechange",function f(){
+        if(pc.iceGatheringState==="complete"){clearTimeout(t);pc.removeEventListener("icegatheringstatechange",f);res()}
+      });
+    });
+  }
+
+  function copy(id,btn){
+    var v=$(id).value;if(!v)return;
+    var done=function(){var o=btn.textContent;btn.textContent="Copiado";setTimeout(function(){btn.textContent=o},1400)};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(done,function(){$(id).select();document.execCommand("copy");done()})}
+    else{$(id).select();document.execCommand("copy");done()}
+  }
+
+  $("btn-cam").onclick=async function(){
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){say("Este browser não permite aceder à câmara nesta página. Usa https ou localhost.",true);return}
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720}},audio:{echoCancellation:true,noiseSuppression:true}});
+    }catch(e){
+      say("Não foi possível aceder à câmara ou ao microfone ("+(e.name||"erro")+"). Confirma as permissões do browser.",true);return;
+    }
+    $("local").srcObject=stream;
+    $("btn-cam").disabled=true;
+    ["btn-mic","btn-vid","a-create","b-create"].forEach(function(i){$(i).disabled=false});
+    say("Câmara ligada. Escolhe se inicias a chamada (A) ou se entras (B).");
+  };
+
+  $("btn-mic").onclick=function(){
+    var t=stream.getAudioTracks()[0];if(!t)return;
+    t.enabled=!t.enabled;
+    $("btn-mic").textContent=t.enabled?"Silenciar microfone":"Ativar microfone";
+  };
+  $("btn-vid").onclick=function(){
+    var t=stream.getVideoTracks()[0];if(!t)return;
+    t.enabled=!t.enabled;
+    $("btn-vid").textContent=t.enabled?"Desligar câmara":"Ligar câmara de novo";
+  };
+
+  $("a-create").onclick=async function(){
+    try{
+      say("A criar código…");
+      newPC();
+      var offer=await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await gathered();
+      $("a-offer").value=enc(pc.localDescription);
+      $("a-copy").disabled=false;$("a-connect").disabled=false;
+      setState("à espera da resposta");
+      say("Código criado. Envia-o ao dispositivo B.");
+    }catch(e){say("Erro ao criar o código: "+e.message,true)}
+  };
+  $("a-copy").onclick=function(){copy("a-offer",$("a-copy"))};
+  $("a-connect").onclick=async function(){
+    try{
+      var d=dec($("a-answer").value);
+      await pc.setRemoteDescription(d);
+      say("A ligar…");
+    }catch(e){say("Código de resposta inválido. Cola-o completo, sem alterações.",true)}
+  };
+
+  $("b-create").onclick=async function(){
+    try{
+      var d=dec($("b-offer").value);
+      say("A gerar resposta…");
+      newPC();
+      await pc.setRemoteDescription(d);
+      var ans=await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      await gathered();
+      $("b-answer").value=enc(pc.localDescription);
+      $("b-copy").disabled=false;
+      setState("à espera do dispositivo A");
+      say("Resposta pronta. Envia-a ao dispositivo A.");
+    }catch(e){say("Código do dispositivo A inválido. Cola-o completo, sem alterações.",true)}
+  };
+  $("b-copy").onclick=function(){copy("b-answer",$("b-copy"))};
+
+  $("btn-end").onclick=function(){
+    if(pc){pc.close()}
+    $("remote").srcObject=null;
+    ["a-offer","a-answer","b-offer","b-answer"].forEach(function(i){$(i).value=""});
+    ["a-copy","a-connect","b-copy","btn-end"].forEach(function(i){$(i).disabled=true});
+    setState("sem ligação");
+    say("Chamada terminada. Para outra chamada, cria códigos novos.");
+  };
+})();
+</script>
+</body>
+</html>
